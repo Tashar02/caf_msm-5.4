@@ -4690,6 +4690,12 @@ static int stmmac_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCDEVPRIVATE:
 		ret = priv->plat->handle_prv_ioctl(dev, rq, cmd);
 		break;
+	case ETHQOS_PRV_IOCTL_L3_FILTER_IPv4:
+		ret = priv->plat->handle_prv_ioctl_filter_ipv4(dev, rq);
+		break;
+	case ETHQOS_PRV_IOCTL_L3_FILTER_IPv6:
+		ret = priv->plat->handle_prv_ioctl_filter_ipv6(dev, rq);
+		break;
 	default:
 		break;
 	}
@@ -5123,6 +5129,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 		 * platform) with the values from the HW capability
 		 * register (if supported).
 		 */
+		priv->num_l3_l4_filters = 0;
 		priv->plat->enh_desc = priv->dma_cap.enh_desc;
 		priv->plat->pmt = priv->dma_cap.pmt_remote_wake_up;
 		priv->hw->pmt = priv->plat->pmt;

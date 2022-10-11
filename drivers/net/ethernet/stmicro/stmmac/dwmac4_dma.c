@@ -373,6 +373,7 @@ static int dwmac4_get_hw_feature(void __iomem *ioaddr,
 	 */
 	dma_cap->tx_fifo_size = 128 << ((hw_cap & GMAC_HW_TXFIFOSIZE) >> 6);
 	dma_cap->rx_fifo_size = 128 << ((hw_cap & GMAC_HW_RXFIFOSIZE) >> 0);
+	dma_cap->l3l4fnum = (hw_cap & GMAC_HW_L3L4FNUM) >> 27;
 	/* MAC HW feature2 */
 	hw_cap = readl(ioaddr + GMAC_HW_FEATURE2);
 	/* TX and RX number of channels */

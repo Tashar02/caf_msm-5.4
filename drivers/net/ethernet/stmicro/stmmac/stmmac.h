@@ -264,7 +264,7 @@ struct stmmac_priv {
 	bool en_wol;
 
 	bool hw_offload_enabled;
-
+	int num_l3_l4_filters;
 };
 
 enum stmmac_state {

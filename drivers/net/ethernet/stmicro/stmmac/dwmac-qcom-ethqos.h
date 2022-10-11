@@ -81,6 +81,8 @@ do  {\
 
 #define ETHQOS_CONFIG_PPSOUT_CMD 44
 #define ETHQOS_AVB_ALGORITHM 27
+#define ETHQOS_PRV_IOCTL_L3_FILTER_IPv4 (SIOCDEVPRIVATE + 2)
+#define ETHQOS_PRV_IOCTL_L3_FILTER_IPv6 (SIOCDEVPRIVATE + 3)
 
 #define MAC_PPS_CONTROL			0x00000b70
 #define PPS_MAXIDX(x)			((((x) + 1) * 8) - 1)
@@ -1116,6 +1118,27 @@ struct dwmac_qcom_avb_algorithm {
 	struct dwmac_qcom_avb_algorithm_params speed100params;
 	struct dwmac_qcom_avb_algorithm_params speed1000params;
 	enum dwmac_qcom_queue_operating_mode op_mode;
+};
+
+struct l4_filter_info {
+	uint8_t l4_proto_number;
+	u16 src_port;
+	u16 dest_port;
+};
+
+struct l3_l4_ipv4_filter {
+	u32 src_addr;
+	uint8_t src_addr_mask;
+	u32 dest_addr;
+	uint8_t dest_addr_mask;
+	struct l4_filter_info l4_filter;
+};
+
+struct l3_l4_ipv6_filter {
+	bool src_or_dest_ip;
+	unsigned char src_or_dest_addr[16];
+	unsigned char src_or_dest_addr_mask;
+	struct l4_filter_info l4_filter;
 };
 
 void qcom_ethqos_request_phy_wol(void *plat_n);
