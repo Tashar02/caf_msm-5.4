@@ -49,6 +49,10 @@
 #define IPAHAL_NAT_INVALID_PROTOCOL   0xFF
 
 #define IPA_ETH_API_VER 2
+/**
+ * We will support up to 15 vlans for ttl
+ */
+#define IPA_TTL_MAX_VLAN    15
 
 /**
  * commands supported by IPA driver
@@ -151,6 +155,7 @@
 #define IPA_IOCTL_QUERY_CACHED_DRIVER_MSG       94
 #define IPA_IOCTL_SET_EXT_ROUTER_MODE           95
 #define IPA_IOCTL_ADD_DEL_DSCP_PCP_MAPPING      96
+#define IPA_IOCTL_TTL_VLAN_MAPPING              97
 /**
  * max size of the header to be inserted
  */
@@ -276,6 +281,8 @@
 #define IPA_FLT_EXT_NEXT_HDR                  (1ul << 4)
 /* ip protocol/udp ports/eth-type */
 #define IPA_FLT_EXT_MPLS_GRE_GENERAL          (1ul << 5)
+/*to check ttl field in ip header*/
+#define IPA_FLT_EXT_TTL_FIELD                 (1ul << 6)
 
 /**
  * maximal number of NAT PDNs in the PDN config table
@@ -763,7 +770,8 @@ enum ipa_flt_action {
 	IPA_PASS_TO_ROUTING,
 	IPA_PASS_TO_SRC_NAT,
 	IPA_PASS_TO_DST_NAT,
-	IPA_PASS_TO_EXCEPTION
+	IPA_PASS_TO_EXCEPTION,
+	IPA_TTL_PASS
 };
 
 /**
@@ -1262,7 +1270,7 @@ struct ipa_rule_attrib {
 	__u16 payload_length;
 	__u32 ext_attrib_mask;
 	__u8 l2tp_udp_next_hdr;
-	__u8 padding1;
+	__u8 ttl_value;
 	struct ipa_field_val_equation_gen fld_val_eq;
 };
 
@@ -2033,6 +2041,11 @@ struct ipa_ioc_del_hdr_proc_ctx {
 	uint8_t commit;
 	uint8_t num_hdls;
 	struct ipa_hdr_proc_ctx_del hdl[0];
+};
+
+struct ipa_ttl_vlan_ids {
+	uint16_t num_vlanids;
+	uint16_t vlans[IPA_TTL_MAX_VLAN];
 };
 
 /**
@@ -4027,6 +4040,10 @@ struct ipa_ioc_dscp_pcp_map_info {
 #define IPA_IOC_ADD_DEL_DSCP_PCP_MAPPING _IOWR(IPA_IOC_MAGIC, \
 				IPA_IOCTL_ADD_DEL_DSCP_PCP_MAPPING, \
 				struct ipa_ioc_dscp_pcp_map_info)
+
+#define IPA_IOC_TTL_VLAN_MAPPING _IOWR(IPA_IOC_MAGIC,	\
+				IPA_IOCTL_TTL_VLAN_MAPPING, \
+				struct ipa_ttl_vlan_ids)
 
 /*
  * unique magic number of the Tethering bridge ioctls
