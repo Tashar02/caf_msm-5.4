@@ -1561,6 +1561,13 @@ config PLATFORM_AUTO
 
 	  If you are unsure about this, Say N here.
 
+config SUBSYS_BACKUP
+	bool "Subsystem Backup-Restore driver"
+	help
+	  This driver helps HLOS to backup-restore the remote subsystem image.
+	  This driver implements the QMI interface and responds to the backup
+	  and restore requests from the remote subsystem.
+
 source "drivers/soc/qcom/icnss2/Kconfig"
 
 source "drivers/soc/qcom/gnsssirf/Kconfig"
