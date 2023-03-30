@@ -396,7 +396,7 @@ int cnss_wlfw_respond_mem_send_sync(struct cnss_plat_data *plat_priv)
 		goto out;
 	}
 
-	if (resp->resp.result != QMI_RESULT_SUCCESS_V01) {
+	if (resp->resp.result != QMI_RESULT_SUCCESS_V01 && resp->resp.error != 0) {
 		cnss_pr_err("Respond memory request failed, result: %d, err: %d\n",
 			    resp->resp.result, resp->resp.error);
 		ret = -resp->resp.result;

@@ -1966,8 +1966,13 @@ static void cnss_driver_event_work(struct work_struct *work)
 			break;
 		case CNSS_DRIVER_EVENT_REQUEST_MEM:
 			ret = cnss_bus_alloc_fw_mem(plat_priv);
-			if (ret)
-				break;
+			if (ret) {
+				cnss_pr_dbg("clear mem seg len\n");
+				plat_priv->fw_mem_seg_len = 0;
+				plat_priv->smaller_size_mem_req = true;
+			} else {
+				plat_priv->smaller_size_mem_req = false;
+			}
 			ret = cnss_wlfw_respond_mem_send_sync(plat_priv);
 			break;
 		case CNSS_DRIVER_EVENT_FW_MEM_READY:
