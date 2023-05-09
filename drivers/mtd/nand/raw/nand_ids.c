@@ -185,6 +185,7 @@ struct nand_flash_dev nand_flash_ids[] = {
 
 	{NULL}
 };
+EXPORT_SYMBOL_GPL(nand_flash_ids);
 
 /* Manufacturer IDs */
 static const struct nand_manufacturer nand_manufacturers[] = {
@@ -224,3 +225,4 @@ const struct nand_manufacturer *nand_get_manufacturer(u8 id)
 
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(nand_get_manufacturer);
