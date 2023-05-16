@@ -785,8 +785,6 @@ error:
 
 static int free_buffers(struct subsys_backup *backup_dev)
 {
-	BUG_ON(!backup_dev->img_buf.hyp_assigned_to_hlos);
-
 	if (backup_dev->img_buf.vaddr == NULL)
 		return 0;
 
