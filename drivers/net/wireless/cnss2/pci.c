@@ -4146,20 +4146,20 @@ retry:
 				dma_alloc_attrs(dev, fw_mem[i].size,
 						&fw_mem[i].pa, GFP_KERNEL,
 						fw_mem[i].attrs);
-
 			if (!fw_mem[i].va) {
-				if ((fw_mem[i].attrs &
-				    DMA_ATTR_FORCE_CONTIGUOUS)) {
-					fw_mem[i].attrs &=
-					    ~DMA_ATTR_FORCE_CONTIGUOUS;
-
-					cnss_pr_dbg("Fallback to non-contiguous memory for FW, Mem type: %u\n",
+				if (plat_priv->smaller_size_mem_req) {
+					if((fw_mem[i].attrs &
+						DMA_ATTR_FORCE_CONTIGUOUS)) {
+						fw_mem[i].attrs &=
+						~DMA_ATTR_FORCE_CONTIGUOUS;
+						cnss_pr_dbg("Fallback to non-contiguous memory for FW, Mem type: %u\n",
 						    fw_mem[i].type);
-					goto retry;
+						goto retry;
+					}
 				}
 
 				cnss_pr_err("Failed to allocate memory for FW, size: 0x%zx, type: %u\n",
-					    fw_mem[i].size, fw_mem[i].type);
+						fw_mem[i].size, fw_mem[i].type);
 				CNSS_ASSERT(0);
 				return -ENOMEM;
 			}
