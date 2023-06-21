@@ -276,13 +276,9 @@ retry_write:
 	}
 
 retry_write_done:
-	ret = wait_for_completion_interruptible_timeout(&ipc_dev->write_done,
+	ret = wait_for_completion_timeout(&ipc_dev->write_done,
 				msecs_to_jiffies(IPC_WRITE_WAIT_TIMEOUT));
-	if (ret < 0) {
-		pr_err("%s: Interruption triggered\n", __func__);
-		ret = -EINTR;
-		goto fail;
-	} else if (ret == 0 && ipc_dev->online) {
+	if (ret == 0 && ipc_dev->online) {
 		pr_err("%s: Request timed out\n", __func__);
 		ret = -ETIMEDOUT;
 		goto fail;
