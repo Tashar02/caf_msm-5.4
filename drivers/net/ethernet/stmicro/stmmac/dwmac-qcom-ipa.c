@@ -35,7 +35,6 @@
 
 #define NTN_IPA_DBG_MAX_MSG_LEN 3000
 #define IPA_SYSFS_DEV_ATTR_PERMS 0644
-static char buf[3000];
 static struct ethqos_prv_ipa_data eth_ipa_ctx;
 static void __ipa_eth_free_msg(void *buff, u32 len, u32 type) {}
 static struct class *emac_ipa_class;
@@ -366,7 +365,7 @@ static inline phys_addr_t eth_ipa_queue_type_to_tx_reg_base_ptr_pa(enum ipa_queu
 
 static void eth_ipa_handle_rx_interrupt(unsigned int qinx)
 {
-	int type;
+	int type = 0;
 
 	if (!eth_ipa_ctx.ipa_offload_conn) {
 		ETHQOSERR("IPA Offload not connected\n");
@@ -388,7 +387,7 @@ static void eth_ipa_handle_rx_interrupt(unsigned int qinx)
 
 static void eth_ipa_handle_tx_interrupt(unsigned int qinx)
 {
-	int type;
+	int type = 0;
 
 	if (!eth_ipa_ctx.ipa_offload_conn) {
 		ETHQOSERR("IPA Offload not connected\n");
@@ -1172,7 +1171,7 @@ static void ethqos_rx_skb_free_mem(struct qcom_ethqos *ethqos,
 
 static void ethqos_free_ipa_queue_mem(struct qcom_ethqos *ethqos)
 {
-	int type;
+	int type = 0;
 
 	for (type = 0; type < IPA_QUEUE_MAX; type++) {
 		if (eth_ipa_queue_type_enabled(type)) {
@@ -1374,7 +1373,7 @@ static int enable_rx_dma_interrupts(unsigned int QINX, struct qcom_ethqos *ethqo
 
 static void ethqos_ipa_config_queues(struct qcom_ethqos *ethqos)
 {
-	int type;
+	int type = 0;
 
 	for (type = 0; type < IPA_QUEUE_MAX; type++) {
 		if (eth_ipa_queue_type_enabled(type)) {
@@ -1693,7 +1692,7 @@ static ssize_t read_ipa_offload_status(struct device *dev,
 	struct net_device *netdev = to_net_dev(dev);
 	struct stmmac_priv *priv;
 	struct qcom_ethqos *ethqos;
-	int type;
+	int type = 0;
 
 	if (!netdev) {
 		ETHQOSERR("netdev is NULL\n");
@@ -2176,7 +2175,7 @@ static ssize_t read_ntn_dma_stats(struct file *file,
 	char *buf;
 	unsigned int len = 0, buf_len = 6000;
 	ssize_t ret_cnt = 0;
-	int type;
+	int type = 0;
 
 	buf = kzalloc(buf_len, GFP_KERNEL);
 	if (!buf)
@@ -2890,9 +2889,6 @@ static int ethqos_ipa_offload_suspend_be(struct qcom_ethqos *ethqos)
 	}
 
 	return ret;
-err_revert_dma_map:
-	priv->hw->mac->map_mtl_to_dma(priv->hw, EMAC_QUEUE_0, EMAC_CHANNEL_0);
-	return ret;
 }
 
 static int ethqos_ipa_offload_suspend(struct qcom_ethqos *ethqos,
@@ -3076,7 +3072,7 @@ static int ethqos_disable_ipa_offload(struct qcom_ethqos *ethqos)
 static int ethqos_enable_ipa_offload(struct qcom_ethqos *ethqos)
 {
 	int ret = 0;
-	int type;
+	int type = 0;
 
 	if (!eth_ipa_ctx.ipa_offload_init) {
 		for (type = 0; type < IPA_QUEUE_MAX; type++) {
@@ -3272,7 +3268,7 @@ static int ethqos_ipa_uc_ready(struct qcom_ethqos *pdata)
 void ethqos_ipa_offload_event_handler(void *data,
 				      int ev)
 {
-	int type;
+	int type = 0;
 	u32 proto;
 	struct platform_device *pdev;
 	struct net_device *dev;
@@ -3391,8 +3387,7 @@ void ethqos_ipa_offload_event_handler(void *data,
 		if (eth_ipa_ctx.ipa_uc_ready &&
 		    qcom_ethqos_is_phy_link_up(eth_ipa_ctx.ethqos))
 			ethqos_enable_ipa_offload(eth_ipa_ctx.ethqos);
-
-		if (eth_ipa_ctx.ipa_offload_susp) {
+		if (eth_ipa_ctx.ipa_offload_susp[IPA_QUEUE_BE]) {
 			priv = netdev_priv(platform_get_drvdata(eth_ipa_ctx.ethqos->pdev));
 			priv->hw->mac->map_mtl_to_dma(priv->hw, EMAC_QUEUE_0, EMAC_CHANNEL_1);
 		}
