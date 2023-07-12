@@ -1458,23 +1458,14 @@ static int backup_buffer_release(struct inode *inodep, struct file *filep)
 {
 	struct subsys_backup *backup_dev = container_of(inodep->i_cdev,
 					struct subsys_backup, cdev);
-	int retry = 0, ret;
+	int ret;
 
-	/*
-	 * In case the remote subsystem is actively using the shared memory,
-	 * wait for it to release. Hyp_assing to HLOS before the release might
-	 * fail. Retry hyp_assign for few times before it succeeds.
-	 */
-	do {
-		ret = hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
-		if (ret == 0)
-			break;
-		usleep_range(100000, 200000);
-		BUG_ON(retry == 10);
-		retry++;
-	} while (ret);
+	ret = hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
+	if (ret == 0)
+		dev_err(backup_dev->dev, "%s: hyp-assign failed: %d\n", ret);
 
-	free_buffers(backup_dev);
+	if (backup_dev != NULL) 
+		free_buffers(backup_dev);
 	backup_dev->state = IDLE;
 	atomic_dec(&backup_dev->open_count);
 	return 0;
