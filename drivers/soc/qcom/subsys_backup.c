@@ -19,6 +19,8 @@
 #include <linux/kernel.h>
 #include <linux/cdev.h>
 #include <linux/delay.h>
+#include <linux/cma.h>
+#include <linux/of_reserved_mem.h>
 
 #define SUBSYS_BACKUP_SVC_ID 0x54
 #define SUBSYS_BACKUP_SVC_VERS 1
@@ -1549,6 +1551,29 @@ cdev_add_err:
 	return ret;
 }
 
+static int subsys_backup_cma_region_init(struct subsys_backup *backup_dev)
+{
+	int ret = -1;
+
+	if (backup_dev->dev == NULL) {
+		dev_err(backup_dev->dev, "Failed: backup_dev is NULL\n");
+		return -ENODEV;
+	}
+
+	ret = of_reserved_mem_device_init(backup_dev->dev);
+	if (ret != 0) {
+		dev_err(backup_dev->dev, "Failed of_reserved_mem_device_init\n");
+		return -ENODEV;
+	}
+
+	if (backup_dev->dev->cma_area) {
+		dev_info(backup_dev->dev, "subsys_backup: CMA region is: %s\n",
+				cma_get_name(backup_dev->dev->cma_area));
+	}
+
+	return 0;
+}
+
 static int subsys_backup_driver_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -1574,6 +1599,10 @@ static int subsys_backup_driver_probe(struct platform_device *pdev)
 	backup_dev->scratch_buf.total_size = buf_size;
 
 	ret = subsys_backup_init_device(pdev, backup_dev);
+	if (ret < 0)
+		goto buf_size_err;
+
+	ret = subsys_backup_cma_region_init(backup_dev);
 	if (ret < 0)
 		goto buf_size_err;
 
