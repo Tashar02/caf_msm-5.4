@@ -2103,7 +2103,8 @@ int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue)
 	struct stmmac_tx_queue *tx_q = &priv->tx_queue[queue];
 	unsigned int bytes_compl = 0, pkts_compl = 0;
 	unsigned int entry, count = 0;
-
+	struct ethhdr *eth_header = NULL;
+	unsigned short eth_type = 0;
 	__netif_tx_lock_bh(netdev_get_tx_queue(priv->dev, queue));
 
 	priv->xstats.tx_clean++;
@@ -2148,7 +2149,15 @@ if (priv->dev->stats.tx_packets == 1)
 			}
 			stmmac_get_tx_hwtstamp(priv, p, skb);
 		}
-
+#ifdef CONFIG_DWMAC_QCOM_ETH_AUTOSAR
+		if( skb != NULL)
+			eth_header = (struct ethhdr *) skb_mac_header(skb);
+		if(eth_header != NULL)
+			eth_type = ntohs(eth_header->h_proto);
+		if (eth_type == ETH_P_1588) {
+			priv->plat->HandleTxCompletion(skb, pkts_compl);
+		}
+#endif
 		if (likely(tx_q->tx_skbuff_dma[entry].buf)) {
 			if (tx_q->tx_skbuff_dma[entry].map_as_page)
 				dma_unmap_page(GET_MEM_PDEV_DEV,
@@ -2173,10 +2182,12 @@ if (priv->dev->stats.tx_packets == 1)
 		if (likely(skb != NULL)) {
 			pkts_compl++;
 			bytes_compl += skb->len;
+#ifdef CONFIG_DWMAC_QCOM_ETH_AUTOSAR
+		if (!(eth_type == ETH_P_1588))
+#endif
 			dev_consume_skb_any(skb);
 			tx_q->tx_skbuff[entry] = NULL;
 		}
-
 		stmmac_release_tx_desc(priv, p, priv->mode);
 
 		entry = STMMAC_GET_ENTRY(entry, DMA_TX_SIZE);
@@ -2184,9 +2195,10 @@ if (priv->dev->stats.tx_packets == 1)
 	tx_q->dirty_tx = entry;
 
 	if (!priv->tx_coal_timer_disable)
+#ifndef CONFIG_DWMAC_QCOM_ETH_AUTOSAR
 		netdev_tx_completed_queue(netdev_get_tx_queue(priv->dev, queue),
 					  pkts_compl, bytes_compl);
-
+#endif
 	if (unlikely(netif_tx_queue_stopped(netdev_get_tx_queue(priv->dev,
 								queue))) &&
 	    stmmac_tx_avail(priv, queue) > STMMAC_TX_THRESH) {
@@ -3530,6 +3542,8 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	bool has_vlan;
 	int entry;
 	unsigned int int_mod;
+	struct ethhdr *eth_header = NULL;
+	unsigned short eth_type = 0;
 
 	tx_q = &priv->tx_queue[queue];
 
@@ -3733,10 +3747,16 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * all is coherent before granting the DMA engine.
 	 */
 	wmb();
-
-	if (!priv->tx_coal_timer_disable)
+	if (!priv->tx_coal_timer_disable){
+#ifdef CONFIG_DWMAC_QCOM_ETH_AUTOSAR
+	if( skb != NULL)
+		eth_header = (struct ethhdr *) skb_mac_header(skb);
+	if(eth_header != NULL)
+		eth_type = ntohs(eth_header->h_proto);
+	if (!(eth_type == ETH_P_1588))
+#endif
 		netdev_tx_sent_queue(netdev_get_tx_queue(dev, queue), skb->len);
-
+	}
 	stmmac_enable_dma_transmission(priv, priv->ioaddr);
 
 	tx_q->tx_tail_addr = tx_q->dma_tx_phy + (tx_q->cur_tx * sizeof(*desc));
@@ -4354,7 +4374,13 @@ read_again:
 			skb_set_hash(skb, hash, hash_type);
 
 		skb_record_rx_queue(skb, queue);
+#ifdef CONFIG_DWMAC_QCOM_ETH_AUTOSAR
+		if (eth_type == ETH_P_1588) {
+			priv->plat->HandleRICompletion(skb);
+		}
+#else
 		napi_gro_receive(&ch->rx_napi, skb);
+#endif
 
 		priv->dev->stats.rx_packets++;
 #ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER

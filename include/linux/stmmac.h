@@ -222,5 +222,8 @@ struct plat_stmmacenet_data {
 	bool sph_disable;
 	unsigned int jumbo_mtu;
 	bool crc_strip_en;
+	bool autosar_en;
+	void (*HandleTxCompletion)(struct sk_buff *skb, u8 result);
+	void (*HandleRICompletion)(struct sk_buff *skb);
 };
 #endif
