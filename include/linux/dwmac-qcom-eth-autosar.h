@@ -3,13 +3,13 @@
 #ifndef	_DWMAC_QCOM_ETH_AUTOSAR_H
 #define	_DWMAC_QCOM_ETH_AUTOSAR_H
 
-struct sk_buff *ethdrv_allocatetxbuffer(size_t);
-int ethdrv_transmit(struct sk_buff *);
-void ethWrapper_registertxcnfcallback(void (*callback)(struct sk_buff *skb, u8 result));
-void ethwrapper_handletxcompletion(struct sk_buff *skb, u8 result);
-void ethwrapper_handlericompletion(struct sk_buff *skb);
-void ethwrapper_registerrxcnfcallback(void (*callback)(struct sk_buff *skb));
-void ethdrv_getcursystime(struct timespec64 *ts);
-void ethdrv_enablets(struct hwtstamp_config *config);
+struct sk_buff *EthDrv_allocateTxBuffer(size_t);
+int EthDrv_Transmit(struct sk_buff *);
+void EthWrapper_RegisterTxCnfCallback(void (*callback)(struct sk_buff *skb, u8 result));
+void EthWrapper_HandleTxCompletion(struct sk_buff *skb, u8 result);
+void EthWrapper_HandleRICompletion(struct sk_buff *skb);
+void EthWrapper_RegisterRxCnfCallback(void (*callback)(struct sk_buff *skb));
+void EthDrv_GetCurSysTime(struct timespec64 *ts);
+void EthDrv_EnableTS(struct hwtstamp_config *config);
 #endif /* _DWMAC_QCOM_ETH_AUTOSAR_H */
 
