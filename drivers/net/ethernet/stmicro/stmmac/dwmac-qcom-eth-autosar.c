@@ -9,17 +9,16 @@
 #include "dwmac-qcom-ethqos.h"
 
 // Define the structure
-struct cnf_callback_structure {
-	void (*txcnfcallback)(struct sk_buff *skb, u8 result);
-	void (*rxcnfcallback) (struct sk_buff *skb);
+struct Cnf_Callback_Structure {
+	void (*g_TxCnfCallback)(struct sk_buff *skb, u8 result);
+	void (*g_RxCnfCallback) (struct sk_buff *skb);
 };
 
 // Create an instance of the structure
-struct cnf_callback_structure cnf_callback_structure_t = {
-	.txcnfcallback = NULL,
-	.rxcnfcallback = NULL
+struct Cnf_Callback_Structure cnf_callback_structure_t = {
+	.g_TxCnfCallback = NULL,
+	.g_RxCnfCallback = NULL
 };
-
 
 /**
  *  EthWrapper_RegisterTxCnfCallback - Resgiter the callback
@@ -27,8 +26,10 @@ struct cnf_callback_structure cnf_callback_structure_t = {
  *  Description:
  *  Function to register the callback for Tx complete in the ETH wrapper API
  */
-void ethWrapper_registertxcnfcallback(void (*callback)(struct sk_buff *skb, u8 result)) {
+void EthWrapper_RegisterTxCnfCallback(void (*callback)(struct sk_buff *skb, u8 result)) {
+	cnf_callback_structure_t.g_TxCnfCallback = callback;
 }
+EXPORT_SYMBOL(EthWrapper_RegisterTxCnfCallback);
 
 /**
  *  EthWrapper_HandleTxCompletion - Handle TX completion
@@ -39,9 +40,13 @@ void ethWrapper_registertxcnfcallback(void (*callback)(struct sk_buff *skb, u8 r
  *  This function handles the completion of a transmit operation. It invokes the registered
  *  callback function, if available, to notify the caller about the transmission result.
  */
-void ethwrapper_handletxcompletion(struct sk_buff *skb, u8 result) {
+void EthWrapper_HandleTxCompletion(struct sk_buff *skb, u8 result) {
+	if (cnf_callback_structure_t.g_TxCnfCallback != NULL) {
+		// Invoke the callback function if its registered
+		cnf_callback_structure_t.g_TxCnfCallback(skb, result);
+	}
 }
-
+EXPORT_SYMBOL(EthWrapper_HandleTxCompletion);
 
 /**
  *  EthWrapper_RegisterRxCnfCallback - Resgiter the callback
@@ -49,9 +54,11 @@ void ethwrapper_handletxcompletion(struct sk_buff *skb, u8 result) {
  *  Description:
  *  Function to register the callback for Rx indication in the ETH wrapper API
  */
-void ethWrapper_registerrxcnfcallback(void (*callback)(struct sk_buff *skb))
+void EthWrapper_RegisterRxCnfCallback(void (*callback)(struct sk_buff *skb))
 {
+	cnf_callback_structure_t.g_RxCnfCallback = callback;
 }
+EXPORT_SYMBOL(EthWrapper_RegisterRxCnfCallback);
 
 /**
  *  EthWrapper_HandleRICompletion - Handle RX indication completion
@@ -61,18 +68,46 @@ void ethWrapper_registerrxcnfcallback(void (*callback)(struct sk_buff *skb))
  *  This function handles the completion of a receive indication. It invokes the registered
  *  callback function, if available, to notify the caller about the received packet.
  */
-void ethwrapper_handlericompletion(struct sk_buff *skb)
+void EthWrapper_HandleRICompletion(struct sk_buff *skb)
 {
+	if(cnf_callback_structure_t.g_RxCnfCallback != NULL)
+	{
+		// Invoke the callback function if its registered
+		cnf_callback_structure_t.g_RxCnfCallback(skb);
+	}
 }
+EXPORT_SYMBOL(EthWrapper_HandleRICompletion);
 
 /**
  *  EthDrv_allocateTxBuffer - Allocate transmit buffer
  *  @size: Size of the buffer to allocate
  *  Description-API to allocate Tx buffer.
  */
-struct sk_buff *ethdrv_allocatetxbuffer(size_t size)
+struct sk_buff *EthDrv_allocateTxBuffer(size_t size)
 {
+	struct sk_buff *skb;
+	struct net_device *eth0_dev = dev_get_by_name(&init_net, "eth0");
+
+	if ( !eth0_dev ) {
+		pr_err(KERN_ERR "\n alloc_skb is failed\n");
+	}
+	skb = netdev_alloc_skb(eth0_dev, size);
+	if ( !skb ) {
+		pr_err(KERN_ERR "\n alloc_skb is failed\n");
+		return -EINVAL;
+	}
+	skb->len = size;
+	skb->data = skb->head;
+	eth0_dev->netdev_ops->ndo_select_queue(eth0_dev, skb, eth0_dev);
+	if( skb->len == 0 ) {
+		return -EINVAL;
+	}
+	if ( ! skb->data ) {
+		return -EINVAL;
+	}
+	return skb;
 }
+EXPORT_SYMBOL(EthDrv_allocateTxBuffer);
 
 /**
  *  EthDrv_Transmit - Transmit the packet
@@ -82,10 +117,17 @@ struct sk_buff *ethdrv_allocatetxbuffer(size_t size)
  *  API to transmit the packet. For the ethernet driver to transmit,
  *  the LG HAL layer needs to copy the Tx packet into SKB
  */
-int ethdrv_transmit(struct sk_buff *skb)
+int EthDrv_Transmit(struct sk_buff *skb)
 {
+	unsigned int ret = -1;
+	struct net_device *eth0_dev = dev_get_by_name(&init_net, "eth0");
+	if ( !eth0_dev ) {
+		pr_err(KERN_ERR "\n alloc_skb is failed\n");
+	}
+	ret = eth0_dev->netdev_ops->ndo_start_xmit(skb, eth0_dev);
+	return ret;
 }
-
+EXPORT_SYMBOL(EthDrv_Transmit);
 
 /**
  *  EthDrv_GetCurSysTime - Get the current system time.
@@ -94,10 +136,11 @@ int ethdrv_transmit(struct sk_buff *skb)
  *  Description-
  *  API to get the current hardware time from Ethernet controller(ptp system time)
  */
-void ethdrv_getcursystime(struct timespec64 *ts)
+void EthDrv_GetCurSysTime(struct timespec64 *ts)
 {
+	qcom_ethqos_getcursystime(ts);
 }
-
+EXPORT_SYMBOL(EthDrv_GetCurSysTime);
 
 /**
  *  EthDrv_EnableTS - Enable hardware timestamping.
@@ -108,6 +151,10 @@ void ethdrv_getcursystime(struct timespec64 *ts)
  *  This function enables hardware timestamping by calling the EthDrv_EnableTS_Wrapper function
  *  with the provided configuration.
  */
-void ethdrv_enablets(struct hwtstamp_config *config)
+void EthDrv_EnableTS(struct hwtstamp_config *config)
 {
+	int ret = qcom_ethqos_enable_hw_timestamp(config);
+	if( ret != 0 )
+		pr_err("KERN_INFO \n HW TS enabled \n");
 }
+EXPORT_SYMBOL(EthDrv_EnableTS);
