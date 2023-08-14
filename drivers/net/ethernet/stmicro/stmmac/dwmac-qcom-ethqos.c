@@ -4902,6 +4902,9 @@ int qcom_ethqos_enable_hw_timestamp(struct hwtstamp_config *config)
 	u32 sec_inc = 0;
 	u64 temp = 0;
 	struct timespec64 now;
+
+	xmac = priv->plat->has_gmac4 || priv->plat->has_xgmac;
+
 	if (!(priv->dma_cap.time_stamp || priv->adv_ts)) {
 		netdev_alert(priv->dev, "No support for HW time stamping\n");
 		priv->hwts_tx_en = 0;
