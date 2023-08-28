@@ -59,6 +59,23 @@
 
 /*MTL Rx Queue Bit*/
 #define GMAC_MTL_RXQ_DMACH		BIT(4)
+#define GMAC_L3_L4_Control(x)	(0x900 + x * 48)
+#define GMAC_Layer4_Address(x)	(0x904 + x * 48)
+#define GMAC_Layer3_Addr0(x)	(0x910 + x * 48)
+#define GMAC_Layer3_Addr1(x)	(0x914 + x * 48)
+#define GMAC_Layer3_Addr2(x)	(0x918 + x * 48)
+#define GMAC_Layer3_Addr3(x)	(0x91c + x * 48)
+
+#define GMAC_L3_L4_Control_L3PEN	BIT(0)
+#define GMAC_L3_L4_Control_L3SAM	BIT(2)
+#define GMAC_L3_L4_Control_L3DAM	BIT(4)
+#define GMAC_L3_L4_Control_L3HSBM	GENMASK(10, 6)
+#define GMAC_L3_L4_Control_L3HDBM	GENMASK(15, 11)
+#define GMAC_L3_L4_Control_L4PEN	BIT(16)
+#define GMAC_L3_L4_Control_L4SPM	BIT(18)
+#define GMAC_L3_L4_Control_L4DPM	BIT(20)
+#define GMAC_L3_L4_Control_DMCHN	GENMASK(25, 24)
+#define GMAC_L3_L4_Control_DMACHEN	BIT(28)
 
 /* RX Queues Routing */
 #define GMAC_RXQCTRL_AVCPQ_MASK		GENMASK(2, 0)
@@ -83,6 +100,8 @@
 #define GMAC_PACKET_FILTER_PCF		BIT(7)
 #define GMAC_PACKET_FILTER_HPF		BIT(10)
 #define GMAC_PACKET_FILTER_VTFE		BIT(16)
+#define GMAC_PACKET_FILTER_IPFE		BIT(20)
+#define GMAC_PACKET_FILTER_RA		BIT(31)
 
 #define GMAC_MAX_PERFECT_ADDRESSES	128
 
@@ -219,6 +238,7 @@ enum power_event {
 #define GMAC_HW_FEAT_MIISEL		BIT(0)
 
 /* MAC HW features1 bitmap */
+#define GMAC_HW_L3L4FNUM		GENMASK(30, 27)
 #define GMAC_HW_HASH_TB_SZ		GENMASK(25, 24)
 #define GMAC_HW_FEAT_AVSEL		BIT(20)
 #define GMAC_HW_TSOEN			BIT(18)
@@ -265,6 +285,7 @@ enum power_event {
 #define MTL_RXQ_DMA_Q04MDMACH(x)	((x) << 0)
 #define MTL_RXQ_DMA_QXMDMACH_MASK(x)	GENMASK(11 + (8 * ((x) - 1)), 8 * (x))
 #define MTL_RXQ_DMA_QXMDMACH(chan, q)	((chan) << (8 * (q)))
+#define MTL_RXQ0_DDMACH			BIT(4)
 #ifdef CONFIG_DWMAC_QCOM_VER3
 #define MTL_CHAN_BASE_ADDR		0x00008000
 #define MTL_CHAN_BASE_OFFSET		0x1000

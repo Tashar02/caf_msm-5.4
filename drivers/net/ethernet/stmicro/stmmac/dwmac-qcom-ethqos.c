@@ -36,6 +36,7 @@
 #include "dwmac-qcom-ethqos.h"
 #include "stmmac_ptp.h"
 #include "dwmac-qcom-ipa-offload.h"
+#include "dwmac4.h"
 
 
 #include <linux/dwmac-qcom-eth-autosar.h>
@@ -48,6 +49,8 @@ int open_not_called;
 #define PHY_LOOPBACK_1000 0x4140
 #define PHY_LOOPBACK_100 0x6100
 #define PHY_LOOPBACK_10 0x4100
+
+#define L3_L4_Rx_Filter_Chan_Num 2
 
 static void ethqos_rgmii_io_macro_loopback(struct qcom_ethqos *ethqos,
 					   int mode);
@@ -245,6 +248,364 @@ void dwmac_qcom_program_avb_algorithm(struct stmmac_priv *priv,
 	   l_avb_struct.qinx);
 
 	ETHQOSDBG("\n");
+}
+
+bool is_l4_proto_valid(struct l4_filter_info  *l4_filter, bool *no_port)
+{
+	if (l4_filter->l4_proto_number == 0)
+		return true;
+
+	if (l4_filter->l4_proto_number != IPPROTO_UDP &&
+	    l4_filter->l4_proto_number != IPPROTO_TCP) {
+		ETHQOSERR("L4 protocol is neither UDP nor TCP\n");
+		return false;
+	}
+
+	if (l4_filter->src_port == 0  && l4_filter->dest_port == 0)
+		*no_port = true;
+
+	ETHQOSDBG("L4 protocol check passed\n");
+	return true;
+}
+
+bool is_ipv4_filter_valid(struct l3_l4_ipv4_filter *filter)
+{
+	bool no_l4_port = false;
+	bool no_ipv4_addr = false;
+	bool valid_filter;
+
+	valid_filter = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid_filter)
+		return false;
+
+	if (filter->src_addr == 0 && filter->dest_addr == 0)
+		no_ipv4_addr = true;
+
+	if (no_l4_port && no_ipv4_addr) {
+		ETHQOSERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	if (filter->src_addr != 0 && filter->src_addr_mask >= 32) {
+		ETHQOSERR("ipv4 src addr mask is not correct\n");
+		return false;
+	}
+
+	if (filter->dest_addr != 0 && filter->dest_addr_mask >= 32) {
+		ETHQOSERR("ipv4 dest addr mask is not correct\n");
+		return false;
+	}
+
+	return true;
+}
+
+bool is_ipv6_addr_valid(struct l3_l4_ipv6_filter *filter, bool *no_ipv6_addr)
+{
+	int i;
+
+	for (i = 0; i < 16; i++) {
+		if (filter->src_or_dest_addr[i] != 0) {
+			*no_ipv6_addr = false;
+			break;
+		}
+	}
+
+	if (*no_ipv6_addr == false && filter->src_or_dest_addr_mask >= 128)
+		return false;
+
+	return true;
+}
+
+bool is_ipv6_filter_valid(struct l3_l4_ipv6_filter *filter)
+{
+	bool valid;
+	bool no_ipv6_addr = true;
+	bool no_l4_port = false;
+
+	valid = is_ipv6_addr_valid(filter, &no_ipv6_addr);
+
+	if (!valid)
+		return false;
+
+	valid = is_l4_proto_valid(&filter->l4_filter, &no_l4_port);
+
+	if (!valid)
+		return false;
+
+	if (no_ipv6_addr && no_l4_port) {
+		ETHQOSERR("NULL filter is not allowed\n");
+		return false;
+	}
+
+	return true;
+}
+
+void program_l4_filter(struct stmmac_priv *pdata, struct l4_filter_info *filter, int cur_filter_num)
+{
+	int value, port_addr;
+
+	value = readl_relaxed(pdata->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+	if ((filter->src_port) || (filter->dest_port)) {
+		ETHQOSDBG("program L4 filter\n");
+
+		/* program L4 protocol */
+		if (filter->l4_proto_number == IPPROTO_TCP)
+			value &= ~GMAC_L3_L4_Control_L4PEN;
+		else if (filter->l4_proto_number == IPPROTO_UDP)
+			value |= GMAC_L3_L4_Control_L4PEN;
+	}
+
+	if (filter->src_port) {
+		ETHQOSDBG("program L4 src port info\n");
+
+		/* enable L4 src port */
+		value |= GMAC_L3_L4_Control_L4SPM;
+
+		/* write L4 src port */
+		port_addr = readl_relaxed(pdata->ioaddr + GMAC_Layer4_Address(cur_filter_num));
+		port_addr |= filter->src_port;
+		writel_relaxed(port_addr, pdata->ioaddr + GMAC_Layer4_Address(cur_filter_num));
+	}
+
+	if (filter->dest_port) {
+		ETHQOSDBG("program L4 dest port info\n");
+
+		/* enable L4 dest port */
+		value |= GMAC_L3_L4_Control_L4DPM;
+
+		/* write L4 dest port */
+		port_addr = readl_relaxed(pdata->ioaddr + GMAC_Layer4_Address(cur_filter_num));
+		port_addr |= (filter->dest_port << 16);
+		writel_relaxed(port_addr, pdata->ioaddr + GMAC_Layer4_Address(cur_filter_num));
+	}
+
+	writel_relaxed(value, pdata->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+}
+
+static int ethqos_handle_prv_ioctl_filter_ipv4(struct net_device *dev,
+						    struct ifreq *ifr)
+{
+	struct l3_l4_ipv4_filter *filter;
+	int ret = 0;
+	unsigned long missing;
+	int cur_filter_num, value = 0;
+	char ipv4_src_str[24];
+	char ipv4_dest_str[24];
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	ETHQOSDBG("entering ipv4 filter handler\n");
+
+	if (!ifr || !ifr->ifr_ifru.ifru_data)
+		return -EINVAL;
+
+	if (priv->num_l3_l4_filters == priv->dma_cap.l3l4fnum) {
+		ETHQOSERR("no more L3/L4 filters can be added\n");
+		return -EOPNOTSUPP;
+	}
+
+	filter = kzalloc(sizeof(struct l3_l4_ipv4_filter), GFP_KERNEL);
+	if (!filter) {
+		ETHQOSERR("cannot allocate ipv4 filter\n");
+		return -ENOMEM;
+	}
+
+	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
+				 sizeof(struct l3_l4_ipv4_filter));
+	if (missing) {
+		ETHQOSERR("cannot copy ipv4 filter\n");
+		return -EFAULT;
+	}
+
+	snprintf(ipv4_src_str, sizeof(ipv4_src_str), "%pI4", &filter->src_addr);
+	snprintf(ipv4_dest_str, sizeof(ipv4_dest_str), "%pI4", &filter->dest_addr);
+
+	ETHQOSDBG("ipv4 src address = %s\n", ipv4_src_str);
+	ETHQOSDBG("ipv4 src addr mask = %d\n", filter->src_addr_mask);
+	ETHQOSDBG("ipv4 dest address = %s\n", ipv4_dest_str);
+	ETHQOSDBG("ipv4 dest addr mask = %d\n", filter->dest_addr_mask);
+	ETHQOSDBG("ipv4 L4 protocol = %d\n", filter->l4_filter.l4_proto_number);
+	ETHQOSDBG("ipv4 L4 src port = %d\n", filter->l4_filter.src_port);
+	ETHQOSDBG("ipv4 L4 dest port = %d\n", filter->l4_filter.dest_port);
+
+	if (!is_ipv4_filter_valid(filter)) {
+		ETHQOSERR("ipv4 filter is not valid\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (!priv->num_l3_l4_filters) {
+		ETHQOSDBG("installing first filter\n");
+		/*enable dynamic mapping*/
+		value = readl_relaxed(priv->ioaddr + MTL_RXQ_DMA_MAP0);
+		value |= MTL_RXQ0_DDMACH;
+		writel_relaxed(value, priv->ioaddr + MTL_RXQ_DMA_MAP0);
+
+		/* Enable L3/L4 filtering*/
+		value = readl_relaxed(priv->ioaddr + GMAC_PACKET_FILTER);
+		value |= GMAC_PACKET_FILTER_IPFE;
+		value |= GMAC_PACKET_FILTER_RA;
+		writel_relaxed(value, priv->ioaddr + GMAC_PACKET_FILTER);
+	}
+
+	priv->num_l3_l4_filters++;
+	cur_filter_num = priv->num_l3_l4_filters - 1;
+
+	/* Enable DMA channel mapping */
+	value = readl_relaxed(priv->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+	value |= GMAC_L3_L4_Control_DMACHEN;
+
+	/* Write DMA channel number for matched filter */
+	value |= (GMAC_L3_L4_Control_DMCHN & (L3_L4_Rx_Filter_Chan_Num << 24));
+
+	if (filter->src_addr) {
+		ETHQOSDBG("programming ipv4 src addr\n");
+		/*enable L3 src addr */
+		value |= GMAC_L3_L4_Control_L3SAM;
+		/* enable L3 src mask */
+		value |= (GMAC_L3_L4_Control_L3HSBM & (filter->src_addr_mask << 6));
+		/* write L3 src addr */
+		writel_relaxed(filter->src_addr, priv->ioaddr + GMAC_Layer3_Addr0((cur_filter_num)));
+	}
+
+	if (filter->dest_addr) {
+		ETHQOSDBG("programming ipv4 dest addr\n");
+		/*enable L3 dest addr */
+		value |= GMAC_L3_L4_Control_L3DAM;
+		/* enable  L3 dest mask */
+		value |= (GMAC_L3_L4_Control_L3HDBM & (filter->dest_addr_mask << 11));
+		/* write L3 dest addr */
+		writel_relaxed(filter->dest_addr, priv->ioaddr + GMAC_Layer3_Addr1(cur_filter_num));
+	}
+	/*write to GMAC_L3_L4_Control register*/
+	writel_relaxed(value, priv->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+
+	program_l4_filter(priv, &filter->l4_filter, cur_filter_num);
+
+	return ret;
+}
+
+static int ethqos_handle_prv_ioctl_filter_ipv6(struct net_device *dev,
+						    struct ifreq *ifr)
+{
+	struct l3_l4_ipv6_filter *filter;
+	int ret = 0;
+	unsigned long missing;
+	int cur_filter_num, value = 0;
+	char ipv6_str[64];
+	bool no_ipv6_addr = true;
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	ETHQOSDBG("entering ipv6 filter handler\n");
+
+	if (!ifr || !ifr->ifr_ifru.ifru_data)
+		return -EINVAL;
+
+	if (priv->num_l3_l4_filters == priv->dma_cap.l3l4fnum) {
+		ETHQOSERR("no more L3/L4 filters can be added \n");
+		return -EOPNOTSUPP;
+	}
+
+	filter = kzalloc(sizeof(struct l3_l4_ipv6_filter), GFP_KERNEL);
+	if (!filter) {
+		ETHQOSERR("cannot allocate ipv6 filter\n");
+		return -ENOMEM;
+	}
+
+
+	missing = copy_from_user(filter, ifr->ifr_ifru.ifru_data,
+				 sizeof(struct l3_l4_ipv6_filter));
+	if (missing) {
+		ETHQOSERR("could not copy filter from user-space\n");
+		return -EFAULT;
+	}
+
+	if (!is_ipv6_filter_valid(filter)) {
+		ETHQOSERR("ipv6 filter is not valid\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (!priv->num_l3_l4_filters) {
+		ETHQOSDBG("installing first filter\n");
+		/*enable dynamic mapping*/
+		value = readl_relaxed(priv->ioaddr + MTL_RXQ_DMA_MAP0);
+		value |= MTL_RXQ0_DDMACH;
+		writel_relaxed(value, priv->ioaddr + MTL_RXQ_DMA_MAP0);
+
+		/* Enable L3/L4 filtering*/
+		value = readl_relaxed(priv->ioaddr + GMAC_PACKET_FILTER);
+		value |= GMAC_PACKET_FILTER_IPFE;
+		value |= GMAC_PACKET_FILTER_RA;
+		writel_relaxed(value, priv->ioaddr + GMAC_PACKET_FILTER);
+	}
+
+	priv->num_l3_l4_filters++;
+	cur_filter_num = priv->num_l3_l4_filters - 1;
+
+	/* Enable DMA channel mapping */
+	value = readl_relaxed(priv->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+	value |= GMAC_L3_L4_Control_DMACHEN;
+
+	/* Write DMA channel number for matched filter */
+	value |= (GMAC_L3_L4_Control_DMCHN & (L3_L4_Rx_Filter_Chan_Num << 24));
+
+	/* enable L3 protocol */
+	value |= GMAC_L3_L4_Control_L3PEN;
+
+	snprintf(ipv6_str, sizeof(ipv6_str), "%pI6", filter->src_or_dest_addr);
+
+	ETHQOSDBG("is src address = %d\n", filter->src_or_dest_ip);
+	ETHQOSDBG("ipv6 ip addr = %s\n", ipv6_str);
+	ETHQOSDBG("ipv6 mask = %d\n", filter->src_or_dest_addr_mask);
+	ETHQOSDBG("ipv6 L4 protocol = %d\n", filter->l4_filter.l4_proto_number);
+	ETHQOSDBG("ipv6 L4 src port = %d\n", filter->l4_filter.src_port);
+	ETHQOSDBG("ipv6 L4 dest port = %d\n", filter->l4_filter.dest_port);
+
+	is_ipv6_addr_valid(filter, &no_ipv6_addr);
+	if (!no_ipv6_addr) {
+		ETHQOSDBG("programming ipv6 address\n");
+
+		if (filter->src_or_dest_ip)
+			/* enable L3 src addr */
+			value |= GMAC_L3_L4_Control_L3SAM;
+		else
+			/* enable L3 dest addr */
+			value |= GMAC_L3_L4_Control_L3DAM;
+
+		/* enableL3 src mask */
+		value |= (GMAC_L3_L4_Control_L3HSBM & ((filter->src_or_dest_addr_mask & 0x1f) << 6));
+		/* continue writing L3 mask */
+		value |= (GMAC_L3_L4_Control_L3HDBM & ((filter->src_or_dest_addr_mask & 0x60) << 6));
+		/*write to GMAC_L3_L4_Control register*/
+		writel_relaxed(value, priv->ioaddr + GMAC_L3_L4_Control(cur_filter_num));
+		/* write L3 addr */
+		value = filter->src_or_dest_addr[0] << 24 |
+				filter->src_or_dest_addr[1] << 16 |
+				filter->src_or_dest_addr[2] << 8 |
+				filter->src_or_dest_addr[3];
+		writel_relaxed(value, priv->ioaddr + GMAC_Layer3_Addr3(cur_filter_num));
+
+		value = filter->src_or_dest_addr[4] << 24 |
+				filter->src_or_dest_addr[5] << 16 |
+				filter->src_or_dest_addr[6] << 8 |
+				filter->src_or_dest_addr[7];
+		writel_relaxed(value, priv->ioaddr + GMAC_Layer3_Addr2(cur_filter_num));
+
+		value = filter->src_or_dest_addr[8] << 24 |
+				filter->src_or_dest_addr[9] << 16 |
+				filter->src_or_dest_addr[10] << 8 |
+				filter->src_or_dest_addr[11];
+		writel_relaxed(value, priv->ioaddr + GMAC_Layer3_Addr1(cur_filter_num));
+
+		value = filter->src_or_dest_addr[12] << 24 |
+				filter->src_or_dest_addr[13] << 16 |
+				filter->src_or_dest_addr[14] << 8 |
+				filter->src_or_dest_addr[15];
+		writel_relaxed(value, priv->ioaddr + GMAC_Layer3_Addr0(cur_filter_num));
+	}
+
+	program_l4_filter(priv, &filter->l4_filter, cur_filter_num);
+
+	return ret;
 }
 
 unsigned int dwmac_qcom_get_plat_tx_coal_frames(struct sk_buff *skb)
@@ -4225,6 +4586,8 @@ static int _qcom_ethqos_probe(void *arg)
 				      "snps,force_thresh_dma_mode_q0");
 	plat_dat->early_eth = ethqos->early_eth_enabled;
 	plat_dat->handle_prv_ioctl = ethqos_handle_prv_ioctl;
+	plat_dat->handle_prv_ioctl_filter_ipv4 = ethqos_handle_prv_ioctl_filter_ipv4;
+	plat_dat->handle_prv_ioctl_filter_ipv6 = ethqos_handle_prv_ioctl_filter_ipv6;
 	plat_dat->request_phy_wol = qcom_ethqos_request_phy_wol;
 	plat_dat->init_pps = ethqos_init_pps;
 	plat_dat->phy_intr_enable = ethqos_phy_intr_enable;

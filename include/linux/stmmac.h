@@ -212,6 +212,10 @@ struct plat_stmmacenet_data {
 	int (*handle_mac_err)(void *priv, int type, int chan);
 	int (*handle_prv_ioctl)(struct net_device *dev, struct ifreq *ifr,
 				int cmd);
+	int (*handle_prv_ioctl_filter_ipv4)(struct net_device *dev,
+					    struct ifreq *ifr);
+	int (*handle_prv_ioctl_filter_ipv6)(struct net_device *dev,
+					    struct ifreq *ifr);
 	void (*request_phy_wol)(void *plat);
 	int (*init_pps)(void *priv);
 	bool phy_intr_en;
