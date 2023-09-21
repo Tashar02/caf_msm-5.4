@@ -229,5 +229,7 @@ struct plat_stmmacenet_data {
 	bool autosar_en;
 	void (*HandleTxCompletion)(struct sk_buff *skb, u8 result);
 	void (*HandleRICompletion)(struct sk_buff *skb);
+	bool clks_suspended;
+	bool is_phy_off;
 };
 #endif
