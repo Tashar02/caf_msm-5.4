@@ -4590,11 +4590,6 @@ static int _qcom_ethqos_probe(void *arg)
 	plat_dat->bsp_priv = ethqos;
 	plat_dat->fix_mac_speed = ethqos_fix_mac_speed;
 	plat_dat->tx_select_queue = dwmac_qcom_select_queue;
-	if (of_property_read_bool(pdev->dev.of_node,
-				  "disable-intr-mod"))
-		ETHQOSINFO("disabling Interrupt moderation\n");
-	else
-		plat_dat->get_plat_tx_coal_frames =  dwmac_qcom_get_plat_tx_coal_frames;
 	plat_dat->has_gmac4 = 1;
 	plat_dat->tso_en = of_property_read_bool(np, "snps,tso");
 	plat_dat->autosar_en = of_property_read_bool(np, "qcom,autosar");
@@ -4619,6 +4614,13 @@ static int _qcom_ethqos_probe(void *arg)
 	plat_dat->HandleRICompletion = EthWrapper_HandleRICompletion;
 #endif
 	plat_dat->clks_suspended = false;
+
+        if (of_property_read_bool(pdev->dev.of_node,
+                                  "disable-intr-mod") &&
+	    plat_dat->autosar_en)
+                ETHQOSINFO("disabling Interrupt moderation\n");
+        else
+                plat_dat->get_plat_tx_coal_frames =  dwmac_qcom_get_plat_tx_coal_frames;
 
 	/* Get rgmii interface speed for mac2c from device tree */
 	if (of_property_read_u32(np, "mac2mac-rgmii-speed",
