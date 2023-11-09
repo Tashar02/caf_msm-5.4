@@ -2995,6 +2995,7 @@ static void setup_config_registers(struct qcom_ethqos *ethqos,
 	struct net_device *dev = platform_get_drvdata(pdev);
 	struct stmmac_priv *priv = netdev_priv(dev);
 	u32 ctrl = 0;
+	int ipa_offload_disconnected = 0;
 
 	ETHQOSDBG("Speed=%d,dupex=%d,mode=%d\n", speed, duplex, mode);
 
@@ -3048,7 +3049,8 @@ static void setup_config_registers(struct qcom_ethqos *ethqos,
 	priv->dev->phydev->speed = speed;
 	priv->speed  = speed;
 
-	if (!ethqos->susp_ipa_offload) {
+	ethqos_ipa_offload_event_handler(&ipa_offload_disconnected, EV_DPM_SUSPEND);
+	if (!ipa_offload_disconnected) {
 		if (mode > DISABLE_LOOPBACK && pethqos->ipa_enabled)
 			priv->hw->mac->map_mtl_to_dma(priv->hw, EMAC_QUEUE_0,
 						      EMAC_CHANNEL_1);
