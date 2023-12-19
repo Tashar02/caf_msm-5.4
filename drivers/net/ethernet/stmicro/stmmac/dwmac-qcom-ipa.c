@@ -3514,12 +3514,9 @@ void ethqos_ipa_offload_event_handler(void *data,
 			if (!eth_ipa_ctx.ipa_offload_susp[type] &&
 			    !eth_ipa_ctx.ipa_offload_link_down)
 				if (!ethqos_ipa_offload_suspend(eth_ipa_ctx.ethqos,
-								type)) {
+								type))
 					eth_ipa_ctx.ipa_offload_susp[type] =
 					true;
-					if (type == IPA_QUEUE_BE)
-						eth_ipa_ctx.ethqos->susp_ipa_offload = true;
-				}
 		}
 		break;
 	case EV_DPM_RESUME:
@@ -3553,12 +3550,9 @@ void ethqos_ipa_offload_event_handler(void *data,
 		} else {
 			if (eth_ipa_ctx.ipa_offload_susp[type])
 				if (!ethqos_ipa_offload_resume(eth_ipa_ctx.ethqos,
-							       type)) {
+							       type))
 					eth_ipa_ctx.ipa_offload_susp[type] =
 					false;
-					if (type == IPA_QUEUE_BE)
-						eth_ipa_ctx.ethqos->susp_ipa_offload = false;
-				}
 		}
 		break;
 	case EV_IPA_OFFLOAD_REMOVE:

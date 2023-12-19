@@ -984,7 +984,6 @@ struct qcom_ethqos {
 
 	u32 emac_mem_base;
 	bool ipa_enabled;
-	bool susp_ipa_offload;
 
 	/* Mac recovery parameters */
 	int mac_err_cnt[MAC_ERR_CNT];
