@@ -1462,11 +1462,14 @@ static int backup_buffer_release(struct inode *inodep, struct file *filep)
 					struct subsys_backup, cdev);
 	int ret;
 
+	if (!backup_dev)
+		return -ENODEV;
+
 	ret = hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
 	if (ret == 0)
 		dev_err(backup_dev->dev, "%s: hyp-assign failed: %d\n", ret);
 
-	if (backup_dev != NULL) 
+	if (backup_dev != NULL)
 		free_buffers(backup_dev);
 	backup_dev->state = IDLE;
 	atomic_dec(&backup_dev->open_count);
