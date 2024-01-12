@@ -27,6 +27,7 @@
 #include <linux/vmalloc.h>
 #include <linux/sizes.h>
 #include <linux/cma.h>
+#include <linux/dma-mapping-fast.h>
 
 #include <asm/memory.h>
 #include <asm/highmem.h>
@@ -107,10 +108,6 @@ static struct arm_dma_buffer *arm_dma_buffer_find(void *virt)
  * before transfers and delay cache invalidation until transfer completion.
  *
  */
-static void __dma_page_cpu_to_dev(struct page *, unsigned long,
-		size_t, enum dma_data_direction);
-static void __dma_page_dev_to_cpu(struct page *, unsigned long,
-		size_t, enum dma_data_direction);
 
 static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
 					bool coherent);
@@ -957,7 +954,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
  * platforms with CONFIG_DMABOUNCE.
  * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
  */
-static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)
 {
 	phys_addr_t paddr;
@@ -973,7 +970,7 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
 	/* FIXME: non-speculating: flush on bidirectional mappings? */
 }
 
-static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)
 {
 	phys_addr_t paddr = page_to_phys(page) + off;
