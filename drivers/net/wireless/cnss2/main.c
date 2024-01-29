@@ -1946,9 +1946,12 @@ static void cnss_driver_event_work(struct work_struct *work)
 		return;
 	}
 
-	cnss_pm_stay_awake(plat_priv);
-
 	spin_lock_irqsave(&plat_priv->event_lock, flags);
+
+	if (list_empty(&plat_priv->event_list))
+		goto out;
+
+	cnss_pm_stay_awake(plat_priv);
 
 	while (!list_empty(&plat_priv->event_list)) {
 		event = list_first_entry(&plat_priv->event_list,
@@ -2062,9 +2065,9 @@ static void cnss_driver_event_work(struct work_struct *work)
 
 		spin_lock_irqsave(&plat_priv->event_lock, flags);
 	}
-	spin_unlock_irqrestore(&plat_priv->event_lock, flags);
-
 	cnss_pm_relax(plat_priv);
+out:
+	spin_unlock_irqrestore(&plat_priv->event_lock, flags);
 }
 
 int cnss_va_to_pa(struct device *dev, size_t size, void *va, dma_addr_t dma,
