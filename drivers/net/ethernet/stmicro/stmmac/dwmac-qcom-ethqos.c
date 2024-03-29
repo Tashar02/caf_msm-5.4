@@ -4619,7 +4619,7 @@ static int _qcom_ethqos_probe(void *arg)
 
         if (of_property_read_bool(pdev->dev.of_node,
                                   "disable-intr-mod") &&
-	    plat_dat->autosar_en)
+	    !plat_dat->autosar_en)
                 ETHQOSINFO("disabling Interrupt moderation\n");
         else
                 plat_dat->get_plat_tx_coal_frames =  dwmac_qcom_get_plat_tx_coal_frames;
