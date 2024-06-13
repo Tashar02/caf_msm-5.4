@@ -467,7 +467,7 @@ retry:
 			}
 		}
 
-		inst = match ? inst : NULL;
+		inst = match && kref_get_unless_zero(&inst->kref) ? inst : NULL;
 		mutex_unlock(&core->lock);
 	} else {
 		if (core->state == CVP_CORE_UNINIT)
