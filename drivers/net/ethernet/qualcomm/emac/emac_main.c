@@ -1893,7 +1893,6 @@ int emac_mac_up(struct emac_adapter *adpt)
 		return 0;
 
 	emac_init_ring_ptrs(adpt);
-	emac_set_rx_mode(netdev);
 
 	emac_hw_config_mac(hw);
 	emac_config_rss(adpt);
@@ -1955,6 +1954,8 @@ int emac_mac_up(struct emac_adapter *adpt)
 	CLR_FLAG(adpt, ADPT_STATE_DOWN);
 	/* check link status */
 	SET_FLAG(adpt, ADPT_TASK_LSC_REQ);
+
+	emac_set_rx_mode(netdev);
 
 	return ret;
 
