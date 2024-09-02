@@ -82,6 +82,12 @@ struct f_uvc_opts {
 	struct mutex			lock;
 	int				refcnt;
 	bool				disable_interrupt_ep;
+	unsigned int			last_unit_id;
+	/*
+	 * Control descriptors for extension units. There could be any number
+	 * of these, including none at all.
+	 */
+	struct list_head		extension_units;
 };
 
 #endif /* U_UVC_H */
