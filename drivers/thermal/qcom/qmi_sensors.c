@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
@@ -21,6 +22,7 @@
 
 #define QMI_SENS_DRIVER		"qmi-therm-sensors"
 #define QMI_TS_RESP_TOUT	msecs_to_jiffies(100)
+#define QMI_TS_TXN_WAIT_TOUT	msecs_to_jiffies(3000)
 #define QMI_CLIENT_NAME_LENGTH	40
 #define QMI_FL_SIGN		0x80000000
 #define QMI_FL_EXP		0x7f800000
@@ -517,7 +519,7 @@ static int verify_sensor_and_register(struct qmi_ts_instance *ts)
 		goto reg_exit;
 	}
 
-	ret = qmi_txn_wait(&txn, QMI_TS_RESP_TOUT);
+	ret = qmi_txn_wait(&txn, QMI_TS_TXN_WAIT_TOUT);
 	if (ret < 0) {
 		pr_err("Transaction wait error for inst_id:0x%x ret:%d\n",
 			ts->inst_id, ret);
