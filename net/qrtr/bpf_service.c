@@ -7,7 +7,6 @@
 #include <net/sock.h>
 #include "bpf_service.h"
 #include <linux/bpf.h>
-#include <linux/rcupdate.h>
 #include "qrtr.h"
 
 /* qrtr filter (based on eBPF) related declarations */
