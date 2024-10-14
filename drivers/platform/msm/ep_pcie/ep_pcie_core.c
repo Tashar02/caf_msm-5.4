@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.*/
+/* Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.*/
 
 /*
  * MSM PCIe endpoint core driver.
@@ -2737,8 +2738,7 @@ int32_t ep_pcie_irq_init(struct ep_pcie_dev_t *dev)
 	INIT_WORK(&dev->handle_d3cold_work, handle_d3cold_func);
 
 	if (dev->aggregated_irq) {
-		if (!ep_pcie_dev.perst_enum)
-			irq_set_status_flags(dev->irq[EP_PCIE_INT_GLOBAL].num, IRQ_NOAUTOEN);
+		irq_set_status_flags(dev->irq[EP_PCIE_INT_GLOBAL].num, IRQ_NOAUTOEN);
 		ret = devm_request_irq(pdev,
 			dev->irq[EP_PCIE_INT_GLOBAL].num,
 			ep_pcie_handle_global_irq,
@@ -3662,8 +3662,7 @@ static int ep_pcie_probe(struct platform_device *pdev)
 
 	qcom_edma_init(&pdev->dev);
 
-	if (!ep_pcie_dev.perst_enum)
-		enable_irq(ep_pcie_dev.irq[EP_PCIE_INT_GLOBAL].num);
+	enable_irq(ep_pcie_dev.irq[EP_PCIE_INT_GLOBAL].num);
 	return 0;
 
 irq_deinit:
