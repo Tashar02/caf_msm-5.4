@@ -2762,17 +2762,18 @@ retry:
 
 	ret = cnss_pci_start_mhi(pci_priv);
 	if (ret) {
-		cnss_fatal_err("Failed to start MHI, err = %d\n", ret);
+		cnss_fatal_err("Failed to start MHI, err = %d, state = 0x%lx\n",
+				ret, plat_priv->driver_state);
 		if (!test_bit(CNSS_DEV_ERR_NOTIFY, &plat_priv->driver_state) &&
 		    !pci_priv->pci_link_down_ind && timeout) {
 			if (test_bit(CNSS_DRIVER_RECOVERY, &plat_priv->driver_state)) {
 				CNSS_ASSERT(0);
 				mhi_force_power_off = true;
-				goto stop_mhi;
 			} else {
 				/* Start recovery directly for MHI start failures */
 				cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 						       CNSS_REASON_DEFAULT);
+				return 0;
 			}
 		}
 		goto stop_mhi;
