@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/ion.h>
@@ -779,16 +779,21 @@ static int get_args(struct fastrpc_invoke_ctx *ctx)
 		if (fds && (fds[i] != -1) && attrs) {
 			err = fastrpc_mmap_create(fl, fds[i], attrs[i],
 					0, 0, dmaflags, &maps[i]);
-			if (!err && maps[i])
-				maps[i]->ctx_refs++;
 			if (err) {
 				for (j = bufs; j < i; j++) {
-					if (maps[j] && maps[j]->ctx_refs)
-						maps[j]->ctx_refs--;
-					fastrpc_mmap_free(fl, maps[j], 0);
+					if (maps[j] && maps[j]->dma_handle_refs) {
+						maps[j]->dma_handle_refs--;
+						fastrpc_mmap_free(fl, maps[j], 0);
+					}
 				}
 				mutex_unlock(&fl->map_mutex);
 				goto bail;
+			} else if (maps[i]) {
+				/*
+				 * Increment  refs count for in/out handle if map created
+				 * and no error, indicate map under use in remote call
+				 */
+				maps[i]->dma_handle_refs++;
 			}
 			handlelen += SIZE_OF_MAPPING(maps[i]->table->nents);
 		}
@@ -1110,9 +1115,10 @@ static int put_args(struct fastrpc_invoke_ctx *ctx)
 				break;
 			if (!fastrpc_mmap_find(fl, (int)fdlist[i], 0, 0,
 						0, 0, &mmap)) {
-				if (mmap && mmap->ctx_refs)
-					mmap->ctx_refs--;
-				fastrpc_mmap_free(fl, mmap, 0);
+				if (mmap && mmap->dma_handle_refs) {
+					mmap->dma_handle_refs = 0;
+					fastrpc_mmap_free(fl, mmap, 0);
+				}
 			}
 		}
 	}
