@@ -632,6 +632,7 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = c->cdev;
 	struct uvc_device *uvc = to_uvc(f);
+	struct uvcg_extension *xu;
 	struct usb_string *us;
 	unsigned int max_packet_mult;
 	unsigned int max_packet_size;
@@ -730,17 +731,33 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	uvc_hs_streaming_ep.bEndpointAddress = uvc->video.ep->address;
 	uvc_ss_streaming_ep.bEndpointAddress = uvc->video.ep->address;
 
+	/*
+	 * XUs can have an arbitrary string descriptor describing them. If they
+	 * have one pick up the ID.
+	 */
+	list_for_each_entry(xu, &opts->extension_units, list)
+		if (xu->string_descriptor_index)
+			xu->desc.iExtension = cdev->usb_strings[xu->string_descriptor_index].id;
+
+	/*
+	 * We attach the hard-coded defaults incase the user does not provide
+	 * any more appropriate strings through configfs.
+	 */
 	us = usb_gstrings_attach(cdev, uvc_function_strings,
 				 ARRAY_SIZE(uvc_en_us_strings));
 	if (IS_ERR(us)) {
 		ret = PTR_ERR(us);
 		goto error;
 	}
-	uvc_iad.iFunction = us[UVC_STRING_CONTROL_IDX].id;
-	uvc_control_intf.iInterface = us[UVC_STRING_CONTROL_IDX].id;
-	ret = us[UVC_STRING_STREAMING_IDX].id;
-	uvc_streaming_intf_alt0.iInterface = ret;
-	uvc_streaming_intf_alt1.iInterface = ret;
+
+	uvc_iad.iFunction = opts->iad_index ? cdev->usb_strings[opts->iad_index].id :
+		us[UVC_STRING_CONTROL_IDX].id;
+	uvc_streaming_intf_alt0.iInterface = opts->vs0_index ?
+		cdev->usb_strings[opts->vs0_index].id :
+		us[UVC_STRING_STREAMING_IDX].id;
+	uvc_streaming_intf_alt1.iInterface = opts->vs1_index ?
+		cdev->usb_strings[opts->vs1_index].id :
+		us[UVC_STRING_STREAMING_IDX].id;
 
 	/* Allocate interface IDs. */
 	if ((ret = usb_interface_id(c, f)) < 0)
