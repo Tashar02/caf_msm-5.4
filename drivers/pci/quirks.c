@@ -2350,6 +2350,7 @@ static void quirk_disable_aspm_l1(struct pci_dev *dev)
 	pci_disable_link_state(dev, PCIE_LINK_STATE_L1);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_QCOM, 0x0306, quirk_disable_aspm_l1);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_QCOM, 0x0308, quirk_disable_aspm_l1);
 
 /*
  * ASM1083/1085 PCIe-PCI bridge devices cause AER timeout errors on the

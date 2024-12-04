@@ -74,6 +74,14 @@ struct f_uvc_opts {
 	struct uvc_descriptor_header			**uvc_ss_streaming_cls;
 
 	/*
+	 * Indexes into the function's string descriptors allowing users to set
+	 * custom descriptions rather than the hard-coded defaults.
+	 */
+	u8						iad_index;
+	u8						vs0_index;
+	u8						vs1_index;
+
+	/*
 	 * Read/write access to configfs attributes is handled by configfs.
 	 *
 	 * This lock protects the descriptors from concurrent access by
@@ -82,6 +90,12 @@ struct f_uvc_opts {
 	struct mutex			lock;
 	int				refcnt;
 	bool				disable_interrupt_ep;
+	unsigned int			last_unit_id;
+	/*
+	 * Control descriptors for extension units. There could be any number
+	 * of these, including none at all.
+	 */
+	struct list_head		extension_units;
 };
 
 #endif /* U_UVC_H */
